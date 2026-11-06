@@ -1,0 +1,6 @@
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const {Evolution}=require('../evolution.js');
+const config={formation:0,palette:0,colorSpeed:.4,sensitivity:.65};
+test('automatic morphs remain bounded and continuous over a long session',()=>{const e=new Evolution();for(let i=0;i<36000;i++){const before=e.weights.slice();e.update(1/60,config,[1,.5,.3]);assert(Math.abs(e.weights.reduce((a,b)=>a+b,0)-1)<1e-8);assert(e.weights.every((v,j)=>v>=0&&v<=1&&Math.abs(v-before[j])<.03));assert(e.colors.flat().every(v=>v>=0&&v<=1));}assert(e.phase>1);});
+test('manual formation and palette converge smoothly',()=>{const e=new Evolution();e.update(.016,{...config,formation:3,palette:2},[0,0,0]);assert(e.weights[0]>.9);for(let i=0;i<600;i++)e.update(.016,{...config,formation:3,palette:2},[0,0,0]);assert(e.weights[2]>.999);assert(Math.abs(e.colors[0][0]-.43)<.001);});
+test('audio accelerates evolution; zero sensitivity removes that acceleration',()=>{const quiet=new Evolution(),music=new Evolution(),muted=new Evolution();for(let i=0;i<600;i++){quiet.update(.016,config,[0,0,0]);music.update(.016,config,[1,1,1]);muted.update(.016,{...config,sensitivity:0},[1,1,1]);}assert(music.phase>quiet.phase*2);assert.equal(muted.phase,quiet.phase);assert.equal(muted.colorPhase,quiet.colorPhase);});

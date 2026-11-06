@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><link rel="icon" href="data:,"><title>V0.3 render acceptance</title>
+<style>body{background:#101421;color:#d8e9ef;font:14px monospace}iframe{width:960px;height:540px;border:1px solid #667}pre{white-space:pre-wrap}</style>
+<h1>V0.3 render acceptance</h1><pre id="result">RUNNING</pre><iframe id="view"></iframe>
+<script>
+(async()=>{
+const out=document.getElementById('result'),frame=document.getElementById('view'),logs=[];
+const assert=(v,text)=>{if(!v)throw Error(text);logs.push('PASS '+text);out.textContent=logs.join('\n');};
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+try{
+ const source=await (await fetch('/index.html')).text();
+ const mock='<script>window.calls=0;window.wallpaperRegisterAudioListener=cb=>{window.calls++;window.feed=cb};window.testErrors=[];window.addEventListener("error",e=>window.testErrors.push(e.message));<\/script>';
+ frame.srcdoc=source.replace('<head>','<head><base href="/">'+mock);await new Promise(r=>frame.onload=r);await wait(800);
+ const w=frame.contentWindow,snap=()=>w.chromaticFlow.snapshot(),host=w.wallpaperPropertyListener;
+ assert(w.calls===1,'host listener registered once');assert(snap().frames>5&&snap().glError===0,'shader links and draws without GL errors');assert(snap().drawCount===35040&&snap().config.sensitivity===.65,'medium density / 65% defaults');
+ const colors=JSON.stringify(snap().colors);await wait(500);assert(JSON.stringify(snap().colors)!==colors,'automatic palette evolves');
+ for(let mode=1;mode<=3;mode++){
+  host.applyUserProperties({formation:{value:mode},palette:{value:mode},particle:{value:mode-1}});await wait(3200);
+  const s=snap();assert(s.weights[mode-1]>.95&&s.glError===0,'formation '+mode+' converges and particle style '+(mode-1)+' renders');
+ }
+ const t=snap().time;host.setPaused(true);await wait(200);assert(snap().time===t,'host pause stops animation');host.setPaused(false);
+ w.feed(Array(128).fill(1));await wait(250);assert(snap().audio[0]>.4,'music envelope responds');
+ w.feed(Array.from({length:128},(_,i)=>[NaN,Infinity,-5,50][i%4]));await wait(200);assert(snap().audio.every(Number.isFinite),'invalid samples stay finite');await wait(5000);assert(snap().audio.every(v=>v<.001),'stopped music decays smoothly');
+ host.applyUserProperties({formation:{value:Infinity},palette:{value:-5},particle:{value:90},spread:{value:999},colorSpeed:{value:NaN}});assert(snap().config.particle===2&&snap().config.spread===1&&snap().config.palette===0,'property ranges clamp safely');
+ host.applyUserProperties({density:{value:0}});assert(snap().drawCount===12960,'density update rebuilds buffer');
+ const ext=w.document.getElementById('scene').getContext('webgl').getExtension('WEBGL_lose_context');ext.loseContext();await wait(200);assert(snap().lost,'context loss handled');ext.restoreContext();await wait(800);assert(!snap().lost&&snap().glError===0,'context restore rebuilds renderer');
+ assert(w.testErrors.length===0,'no runtime errors');out.textContent+='\nALL CHECKS PASSED';document.title='PASS · V0.3 acceptance';
+}catch(e){out.textContent+='\nFAIL '+e.stack;document.title='FAIL · V0.3 acceptance';}
+})();
+</script></html>
