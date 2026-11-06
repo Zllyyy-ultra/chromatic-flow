@@ -2,7 +2,7 @@
 'use strict';
 const {AudioEnvelope,clamp}=window.FlowAudio;
 const canvas=document.getElementById('scene'),error=document.getElementById('error');
-const config={sensitivity:.65,velocity:.35,brightness:.6,density:1,spread:.55,colorSpeed:.4,formation:0,palette:0,particle:1};
+const config={sensitivity:.65,velocity:.35,brightness:.6,density:1,spread:.75,colorSpeed:.4,formation:0,palette:0,particle:1};
 const evolution=new window.FlowEvolution.Evolution();
 const choices={formation:['自动漫游','流光丝带','星际旋涡','漂浮星云'],palette:['自动变幻','极光','落日','深海','绯梦'],particle:['柔光微尘','闪烁星芒','空灵光环']};
 const audio=new AudioEnvelope();
@@ -12,13 +12,13 @@ if(host)document.body.classList.add('wallpaper');
 if(new URLSearchParams(location.search).has('clean'))document.body.classList.add('hide-ui');
 let gl,program,buffer,uniforms={},raf=0,last=0,lastDraw=0,fpsLimit=60,dpr=1,pointMax=4;
 let measuredStart=0,measuredFrames=0,colorTime=0,motionTime=0;
-const grids=[[144,90],[240,146],[320,196]];
+const grids=[[256,192],[384,288],[512,384]];
 function message(text){error.textContent=text;error.hidden=!text;}
 function syncUI(){for(const key of Object.keys(config)){
   if(choices[key]){document.getElementById(key).value=config[key];continue;}
   const value=key==='density'?config[key]:Math.round(config[key]*100);
   document.getElementById(key).value=value;
-  document.getElementById(key+'-value').textContent=key==='density'?['低','中','高'][value]:value+'%';
+  document.getElementById(key+'-value').textContent=key==='density'?['轻盈','充盈','繁星'][value]:value+'%';
 }}
 function setProperty(key,value){if(!Number.isFinite(value))return;config[key]=choices[key]?Math.round(clamp(value,0,choices[key].length-1)):key==='density'?Math.round(clamp(value,0,2)):clamp(value/100);syncUI();}
 // Register synchronously at the end of body, independently of renderer startup.
@@ -41,7 +41,6 @@ void main(){
  float t=uTime,s=hash(aUV+1.7),q=hash(aUV+8.2),n=hash(aUV+17.4),m=hash(aUV+29.1);
  float travel=fract(s+t*.018),x=(travel-.5)*24.;
  float strand=floor(q*3.)-1.,cross=fract(q*3.)-.5;
- float breath=1.+uBass*.85;
  // Independent seeded particles form moving volumes, never a rectangular grid.
  vec3 ribbon=vec3(x,1.65*sin(x*.24+t*.55+strand*.7)+.55*sin(x*.65-t*.48)+strand*1.1,1.9*cos(x*.2+t*.3+strand));
  ribbon.y+=cross*(.8+uSpread*1.8)*(.35+.65*sin(x*.3+t*.25)*sin(x*.3+t*.25));
@@ -57,24 +56,31 @@ void main(){
  nebula.y+=sin(nebula.x*.45+t*.4)*1.1;nebula.x+=sin(nebula.z*.6+t*.3)*1.4;
  nebula*=1.+uBass*.5;
  vec3 p=ribbon*uWeights.x+vortex*uWeights.y+nebula*uWeights.z;
- p.xy*=.85+uSpread*.4;
+ p.xy*=1.25+uSpread*.8;
+ p.x*=max(1.,uAspect/1.5);
  float twist=.15*sin(t*.18)+uMid*.08,cs=cos(twist),sn=sin(twist);p.xy=mat2(cs,-sn,sn,cs)*p.xy;
  p.z+=sin(t*.15)*.7;
- // Airborne specks provide depth around the denser light streams.
- float dust=step(.88,m);vec3 air=vec3((s-.5)*25.,(q-.5)*13.,(n-.5)*7.);
- air.y+=sin(t*.3+s*6.)*.5;p=mix(p,air,dust*.88);
+ // A substantial screen-filling layer stays present through every morph.
+ // Project from screen coordinates at varying depths so aspect ratios cannot
+ // squeeze the field into a central object. Wrap beyond the visible boundary.
+ float dust=step(.4,m),airDepth=10.+n*12.;
+ vec2 screen=vec2(fract(s+t*(.004+n*.007)),fract(q+t*.003+sin(t*.12+s*6.283)*.025))*2.-1.;
+ screen*=1.16;screen.y+=.055*sin(screen.x*4.+t*.35+n*3.);
+ vec3 air=vec3(screen.x*uAspect*airDepth/1.55,screen.y*airDepth/1.55,airDepth-15.);
+ p=mix(p,air,dust);
  float depth=max(5.,15.+p.z),focal=1.55;
  gl_Position=vec4(p.x*focal/uAspect,p.y*focal,depth*.98-.2,depth);
  float sparkle=pow(max(0.,sin(t*(.8+n)+s*81.)),14.);
  vStar=step(.982,n);
- float size=mix(1.35,2.4,q)+sparkle*.9+uTreble*(.8+vStar*4.);
+ float size=mix(1.75,2.8,q)+sparkle*.9+uTreble*(.8+vStar*4.);
  size+=uParticle>1.5?1.6:0.;size+=vStar*(uParticle>.5&&uParticle<1.5?4.:.8);
  gl_PointSize=clamp(size*15./depth*uDpr,1.,uPointMax);
  // Colour travels through each volume, rather than being pinned to screen X.
  float hue=s*.65+q*.28+sin(p.x*.22+p.y*.3-t*.17)*.19+uColorTime+uEnergy*.18;
  vColor=palette(hue);vColor=mix(vColor,vec3(.9,.95,1.),vStar*.45);
  float fade=smoothstep(0.,.06,travel)*smoothstep(0.,.06,1.-travel);
- vAlpha=(.23+q*.24+sparkle*.1+uEnergy*.13)*mix(1.,.2,dust)*fade;
+ float fieldFade=1.-smoothstep(1.02,1.16,max(abs(screen.x),abs(screen.y)));
+ vAlpha=(.28+q*.24+sparkle*.1+uEnergy*.13)*mix(1.,.72,dust)*mix(fade,fieldFade,dust);
 }`;
 const fragment=`
 precision mediump float;
@@ -154,6 +160,6 @@ document.addEventListener('visibilitychange',schedule);window.addEventListener('
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();state.lost=true;schedule();message('图形上下文暂时中断，正在等待恢复…');});
 canvas.addEventListener('webglcontextrestored',initialize);
 // Read-only diagnostics for acceptance tests and hardware profiling.
-window.chromaticFlow={snapshot:()=>({version:'0.3.0',...state,config:{...config},weights:[...evolution.weights],colors:evolution.colors.map(c=>[...c]),audio:[...audio.values],target:[...audio.target],resolution:[canvas.width,canvas.height],fpsLimit,glError:gl&&!state.lost?gl.getError():null})};
+window.chromaticFlow={snapshot:()=>({version:'0.3.1',...state,config:{...config},weights:[...evolution.weights],colors:evolution.colors.map(c=>[...c]),audio:[...audio.values],target:[...audio.target],resolution:[canvas.width,canvas.height],fpsLimit,glError:gl&&!state.lost?gl.getError():null})};
 syncUI();initialize();
 })();

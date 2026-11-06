@@ -1,9 +1,8 @@
 {
   "title": "Chromatic Flow",
-  "description": "V0.3 · Evolving light ribbons, vortex and nebula with music-driven colour and particles.",
+  "description": "V0.3.1 · Fullscreen particle field, 110592 particles by default.",
   "type": "web",
   "file": "index.html",
-  "preview": "preview.png",
   "general": {
     "supportsaudioprocessing": true,
     "properties": {
@@ -33,7 +32,7 @@
       },
       "density": {
         "order": 3,
-        "text": "粒子密度 / Density",
+        "text": "粒子密度 / Density (49k / 111k / 197k)",
         "type": "slider",
         "value": 1,
         "min": 0,
@@ -116,7 +115,7 @@
         "order": 7,
         "text": "空间舒展 / Spread",
         "type": "slider",
-        "value": 55,
+        "value": 75,
         "min": 0,
         "max": 100
       },

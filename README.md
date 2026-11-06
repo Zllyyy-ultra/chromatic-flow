@@ -1,20 +1,20 @@
-# Chromatic Flow · V0.3
+# Chromatic Flow · V0.3.1
 
-音乐驱动的流光粒子壁纸。**[在线预览](https://zllyyy-ultra.github.io/chromatic-flow/)** · [V0.3 验收](docs/V0.3.md)
+音乐驱动的全屏粒子壁纸。默认 110,592 粒子，最高档 196,608；主形态与全屏流动粒子层共同覆盖四角和边缘。
 
-![Preview](preview.png)
+[在线预览](https://zllyyy-ultra.github.io/chromatic-flow/?v=0.3.1) · [本轮验收](docs/V0.3.1.md)
 
-## 从固定曲面变成自由粒子
+## 效果与控制
 
-- 三种体积形态：流光丝带、三臂旋涡、漂浮星云。自动漫游会连续交融，也可手动固定其中一种。
-- 四套流动配色：极光、落日、深海、绯梦。自动变幻会缓慢过渡；手动配色内部仍有流动色彩。
-- 三种粒子外观：柔光微尘、闪烁星芒、空灵光环。
-- 音乐明显推动聚散、波动、星芒、色流与漫游速度；采用平滑包络，停止音乐后自然回落。
-- 默认中密度 35,040 粒子、65% 音乐响应。更多调节可改变流速、亮度、密度，另外提供空间舒展与色彩流速。
+- 流光丝带、星际旋涡、漂浮星云，可自动交融或手动选择。
+- 极光、落日、深海、绯梦四套流动配色；柔光、星芒、光环三种粒子外观。
+- 音乐响应默认 65%，空间舒展默认 75%。无音频时舒缓流动。
+- 主面板直接调节密度：轻盈 49,152 / 充盈 110,592 / 繁星 196,608。
+- H 隐藏面板，F 全屏，空格暂停。模拟音乐只生成频谱，不播放或录制声音。
 
-## 本地使用
+## 运行与构建
 
-直接离线打开 index.html；也可使用 Node.js 22+：
+直接打开 index.html，或使用 Node.js 22+：
 
 ```sh
 npm start
@@ -22,24 +22,20 @@ npm test
 npm run build
 ```
 
-本地预览 http://127.0.0.1:4173 。点击模拟音乐预览；它只生成频谱，不播放或录制声音。H 收起面板，F 全屏，空格暂停。没有音频时仍有舒缓流动。
+本地地址 http://127.0.0.1:4173 。构建生成 dist/ 和 wallpaper/，无 CDN、无运行依赖。
 
 ## Wallpaper Engine
 
-下载并解压 Actions 的 chromatic-flow-wallpaper 附件，或运行构建后使用 wallpaper/ 文件夹。将 index.html 和全部关联资源导入 Web 壁纸编辑器。完整资源包括 index.html、style.css、audio.js、evolution.js、app.js、project.json、preview.png。也可将文件夹放入 wallpaper_engine/projects/myprojects/。
+解压 Actions 中的 chromatic-flow-wallpaper 附件，或使用构建后的 wallpaper/ 目录。将 index.html 和 style.css、audio.js、evolution.js、app.js、project.json 一同导入 Web 壁纸编辑器。
 
-若编辑器重新生成 project.json，保留 general.properties 和 general.supportsaudioprocessing: true，保存并重新加载。宿主下网页面板自动隐藏，使用 Wallpaper Engine 属性面板调节形态、配色、外观、响应与流速。播放系统音乐验证响应。
+若编辑器重新生成 project.json，保留 general.properties 与 general.supportsaudioprocessing: true，保存并重新加载。宿主下网页面板自动隐藏，在宿主属性中调节。当前包不包含预览缩略图，可在编辑器内保存封面。
 
-本轮验证宿主接口模拟和浏览器渲染；没有运行真实 Wallpaper Engine，未认证系统音频采集与各显卡长期性能。
+## 验证与部署
 
-## 部署与复验
+7 项 Node 测试和 20 项浏览器检查通过。npm start 后打开 /tests/visual.html，检查三种形态的 8×6 全屏分块覆盖、所有外观、音频与断流、属性限幅、最高档、暂停和上下文恢复。该测试页面不进入部署包。
 
-main 推送自动运行 7 项音频/过渡测试、构建、上传导入包并部署 GitHub Pages。Pages Source 应为 GitHub Actions。dist/ 只包含离线资源。
+main 推送自动测试、构建并部署 GitHub Pages，Source 选择 GitHub Actions。
 
-npm start 后打开 /tests/visual.html，可执行真实 WebGL 初始化、三种形态/粒子外观、自动颜色变化、属性限幅、音频与断流、暂停、密度与图形上下文恢复测试。页面末尾显示 ALL CHECKS PASSED 时通过。该测试页不包含在 Pages 和壁纸包中。
+增加粒子会增加 GPU 工作量；保持单次绘制、静态缓冲和内部像素预算。浏览器检查不能替代各显卡实测；真实 Wallpaper Engine 系统音频与长期 GPU 占用仍待验证。
 
-## 技术与隐私
-
-WebGL 1 / GLSL ES 1.00；静态 UV 缓冲、单次绘制、DPR 上限 1.5、约 360 万像素预算。确定性散点取代规则网格；CPU 仅计算少量形态权重和调色板，GPU 计算粒子运动。页面隐藏/宿主暂停时停止绘制，支持上下文恢复。
-
-无 CDN、无运行依赖、无录音、上传或遥测。接口依据：[音频](https://docs.wallpaperengine.io/en/web/audio/visualizer.html)、[宿主属性](https://docs.wallpaperengine.io/en/web/api/propertylistener.html)。V0.2 记录保留在 docs/VALIDATION.md。
+无录音、上传或遥测。此前 B 站参考在本环境无法播放，效果依据用户的描述与后续反馈开发。

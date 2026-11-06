@@ -1,6 +1,6 @@
 {
   "name": "chromatic-flow",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "scripts": {"test": "node --test tests/audio.test.cjs tests/evolution.test.cjs", "start": "node scripts/serve.cjs", "build": "node scripts/build.cjs"}
 }
