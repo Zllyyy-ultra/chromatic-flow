@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="theme-color" content="#050711"/>
+<title>Chromatic Flow · Particle Wave</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#050711;color:#e4e8f7;font-family:system-ui,"Microsoft YaHei",sans-serif}canvas{display:block;width:100%;height:100%}
+#panel{position:fixed;right:20px;top:20px;width:260px;padding:18px;background:rgba(6,9,24,.79);border:1px solid rgba(189,194,255,.18);border-radius:14px;backdrop-filter:blur(16px);box-shadow:0 8px 45px #0005;transition:opacity .3s}
+h1{font-size:17px;font-weight:600;margin:0 0 4px;letter-spacing:.03em}p{font-size:11px;color:#a5aec7;margin:0 0 16px}label{font-size:12px;display:flex;justify-content:space-between;align-items:center;margin:13px 0 6px}input[type=range]{width:100%;accent-color:#9d85ff}button{background:#252d4e;color:#f5f5ff;border:1px solid #465077;border-radius:8px;padding:9px 12px;cursor:pointer;width:100%;margin-top:11px}button:hover{background:#343d64}#info{position:fixed;left:18px;bottom:14px;font-size:11px;color:#8994b6;pointer-events:none}#error{position:fixed;inset:0;display:none;place-items:center;padding:40px;text-align:center;background:#050711;color:#f2b8b8}body.wallpaper #panel,body.wallpaper #info{display:none}body.hide-ui #panel{opacity:0;pointer-events:none}@media(max-width:650px){#panel{width:205px;right:10px;top:10px;padding:12px}}
+</style>
+</head>
+<body>
+<canvas id="scene" aria-label="实时生成的三维粒子波浪"></canvas>
+<div id="panel"><h1>Chromatic Flow</h1><p>V0.1 · WebGL 粒子曲面预览</p>
+<label>音乐灵敏度 <output id="s-value">65%</output></label><input id="sensitivity" type="range" min="0" max="100" value="65">
+<label>待机流动速度 <output id="v-value">35%</output></label><input id="velocity" type="range" min="0" max="100" value="35">
+<label>视觉亮度 <output id="b-value">60%</output></label><input id="brightness" type="range" min="0" max="100" value="60">
+<label>粒子密度 <output id="d-value">中</output></label><input id="density" type="range" min="0" max="2" step="1" value="1">
+<button id="demo">开启模拟音乐节奏</button><button id="fullscreen">隐藏面板（按 H 恢复）</button>
+</div>
+<div id="info">Chromatic Flow · GPU procedural waves · H 隐藏/显示面板</div><div id="error"></div>
+<script>
+(()=>{
+'use strict';
+const canvas=document.querySelector('#scene'), error=document.querySelector('#error');
+const gl=canvas.getContext('webgl2',{alpha:false,antialias:false,powerPreference:'high-performance'});
+if(!gl){error.style.display='grid';error.textContent='此浏览器不支持 WebGL2，请尝试更新显卡驱动或使用最新版 Chrome / Edge。';return;}
+const vertex=`#version 300 es
+precision highp float;
+uniform float uTime,uAspect,uDensity,uEnergy,uBass,uMid,uTreble,uSpeed;
+uniform vec2 uGrid;
+out vec3 vColor;
+out float vAlpha;
+float wave(vec2 p,float t){
+float a=sin(p.x*2.9+t*.45)*cos(p.y*2.2-t*.27);
+float b=.48*sin(p.x*5.8+p.y*2.3-t*.35);
+float c=.20*sin(length(p-vec2(.3,-.2))*8.0-t*.63);
+return a*.46+b*.30+c*.20;
+}
+vec3 palette(float t){
+vec3 a=vec3(.08,.21,.68),b=vec3(.40,.22,.77),c=vec3(.90,.23,.48),d=vec3(1.,.55,.20),e=vec3(.08,.75,.70);
+t=fract(t);
+if(t<.25)return mix(a,b,smoothstep(0.,.25,t));
+if(t<.50)return mix(b,c,smoothstep(.25,.50,t));
+if(t<.75)return mix(c,d,smoothstep(.50,.75,t));
+return mix(d,e,smoothstep(.75,1.,t));
+}
+void main(){
+float idx=float(gl_VertexID);
+float ix=mod(idx,uGrid.x),iy=floor(idx/uGrid.x);
+vec2 uv=vec2(ix/max(1.,uGrid.x-1.),iy/max(1.,uGrid.y-1.));
+vec2 p=(uv-.5)*vec2(9.1,6.7);
+float t=uTime*(.25+uSpeed*.95);
+vec2 drift=p+vec2(t*.14,-t*.055);
+float z=wave(drift,t)+.18*sin(p.x*1.3+p.y*2.5+t*.36);
+float r=length(p-vec2(sin(t*.3)*.65,cos(t*.24)*.28));
+z+=uBass*.85*exp(-r*.28)*sin(r*2.9-t*2.1);
+z+=uMid*.24*sin(p.x*6.+p.y*3.7-t*1.5);
+z+=uTreble*.065*sin(p.x*16.+p.y*13.+t*3.);
+float depth=p.y*.22+z;
+vec2 pos=vec2(p.x*.196,p.y*.23+z*.19);
+pos.x/=max(.8,uAspect/1.6);
+pos.y+=.04;
+gl_Position=vec4(pos,clamp(depth*.09,-.8,.8),1.);
+float sparkle=pow(max(0.,sin(ix*17.41+iy*11.73+t*1.6)),17.);
+float size=(1.15+sparkle*.65+uTreble*sparkle*1.5)*(1.0+max(0.,depth)*.095);
+gl_PointSize=clamp(size,1.,4.);
+float hue=uv.x*.51+uv.y*.18+z*.11+t*.025+uEnergy*.055;
+vColor=palette(hue);
+float fade=smoothstep(0.,.15,uv.x)*smoothstep(0.,.15,1.-uv.x)*smoothstep(0.,.12,uv.y)*smoothstep(0.,.12,1.-uv.y);
+vAlpha=(.25+.60*pow(.5+.5*z,1.3)+sparkle*.24)*fade;
+}
+`;
+const fragment=`#version 300 es
+precision highp float;
+in vec3 vColor;in float vAlpha;
+uniform float uBrightness;out vec4 outColor;
+void main(){
+vec2 q=gl_PointCoord-.5;
+float circle=1.-smoothstep(.13,.55,length(q));
+if(circle<.015)discard;
+vec3 color=vColor*(.55+uBrightness*1.25);
+outColor=vec4(color,circle*vAlpha);
+}
+`;
+function compile(type,src){const shader=gl.createShader(type);gl.shaderSource(shader,src);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(shader));return shader;}
+let program;
+try{program=gl.createProgram();gl.attachShader(program,compile(gl.VERTEX_SHADER,vertex));gl.attachShader(program,compile(gl.FRAGMENT_SHADER,fragment));gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));}catch(e){error.style.display='grid';error.textContent='Shader 初始化失败：'+e.message;return;}
+gl.useProgram(program);gl.bindVertexArray(gl.createVertexArray());gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE);gl.disable(gl.DEPTH_TEST);
+const U={};for(const key of ['uTime','uAspect','uDensity','uEnergy','uBass','uMid','uTreble','uSpeed','uBrightness','uGrid'])U[key]=gl.getUniformLocation(program,key);
+const config={sensitivity:.65,velocity:.35,brightness:.6,density:1};
+let simulated=false, audioSeen=false, audioTime=0, target=[0,0,0], smoothed=[0,0,0], frameTime=performance.now(), clock=0;
+const densityGrid=[[150,92],[240,146],[320,196]];
+function listenAudio(data){if(!data||data.length<128)return;
+audioSeen=true;audioTime=performance.now();
+function band(a,b){let total=0;for(let i=a;i<b;i++)total+=(Math.max(0,data[i])+Math.max(0,data[i+64]))*.5;return total/(b-a);}
+target[0]=Math.min(1,band(0,8)*2.0);target[1]=Math.min(1,band(8,32)*2.2);target[2]=Math.min(1,band(32,64)*3.2);
+}
+if(typeof window.wallpaperRegisterAudioListener==='function'){document.body.classList.add('wallpaper');window.wallpaperRegisterAudioListener(listenAudio);}
+window.wallpaperPropertyListener={applyUserProperties(properties){
+const n=(name,scale)=>{if(properties[name]&&typeof properties[name].value==='number')return properties[name].value/scale;return null;};
+const s=n('sensitivity',100),v=n('velocity',100),b=n('brightness',100),d=n('density',1);
+if(s!==null)config.sensitivity=s;if(v!==null)config.velocity=v;if(b!==null)config.brightness=b;if(d!==null)config.density=Math.max(0,Math.min(2,Math.round(d)));
+}};
+for(const [id,key,div] of [['sensitivity','sensitivity',100],['velocity','velocity',100],['brightness','brightness',100],['density','density',1]]){
+document.getElementById(id).addEventListener('input',e=>{config[key]=Number(e.target.value)/div;document.getElementById(({sensitivity:'s-value',velocity:'v-value',brightness:'b-value',density:'d-value'})[id]).textContent=key==='density'?['低','中','高'][config[key]]:e.target.value+'%';});
+}
+document.getElementById('demo').onclick=e=>{simulated=!simulated;e.target.textContent=simulated?'关闭模拟音乐节奏':'开启模拟音乐节奏';};
+const toggle=()=>document.body.classList.toggle('hide-ui');document.getElementById('fullscreen').onclick=toggle;document.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='h')toggle();});
+function resize(){const dpr=Math.min(window.devicePixelRatio||1,1.75);const w=Math.max(1,Math.round(innerWidth*dpr)),h=Math.max(1,Math.round(innerHeight*dpr));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}}
+function render(now){
+const dt=Math.min((now-frameTime)/1000,.08);frameTime=now;clock+=dt;resize();
+if(simulated){const pulse=Math.pow(Math.max(0,Math.sin(clock*5.3)),7);target=[.12+.75*pulse,.18+.35*(.5+.5*Math.sin(clock*1.7)),.10+.35*Math.pow(Math.max(0,Math.sin(clock*9.1)),8)];}
+else if(!audioSeen||now-audioTime>450){target=[0,0,0];}
+for(let i=0;i<3;i++){const k=target[i]>smoothed[i]?7:1.3;smoothed[i]+=(target[i]-smoothed[i])*(1-Math.exp(-dt*k));}
+const strength=config.sensitivity;
+const bass=smoothed[0]*strength,mid=smoothed[1]*strength,treble=smoothed[2]*strength;
+const energy=Math.min(1,(bass*.48+mid*.37+treble*.15));
+gl.clearColor(.019,.027,.063,1);gl.clear(gl.COLOR_BUFFER_BIT);
+gl.uniform1f(U.uTime,clock);gl.uniform1f(U.uAspect,canvas.width/canvas.height);
+gl.uniform1f(U.uDensity,config.density);gl.uniform1f(U.uEnergy,energy);
+gl.uniform1f(U.uBass,bass);gl.uniform1f(U.uMid,mid);gl.uniform1f(U.uTreble,treble);
+gl.uniform1f(U.uSpeed,config.velocity);gl.uniform1f(U.uBrightness,config.brightness);
+const grid=densityGrid[config.density];gl.uniform2f(U.uGrid,grid[0],grid[1]);
+gl.drawArrays(gl.POINTS,0,grid[0]*grid[1]);
+requestAnimationFrame(render);
+}
+document.addEventListener('visibilitychange',()=>{frameTime=performance.now();});
+requestAnimationFrame(render);
+})();
+</script>
+</body></html>
