@@ -25,10 +25,23 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure Pages
         uses: actions/configure-pages@v5
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test audio processing
+        run: npm test
+      - name: Prepare offline resources
+        run: npm run build
+      - name: Upload Wallpaper Engine bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: chromatic-flow-wallpaper
+          path: wallpaper/
       - name: Upload static site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: dist
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

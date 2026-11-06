@@ -1,0 +1,6 @@
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const {AudioEnvelope}=require('../audio.js');
+test('stereo bands use both channels without mixing bass and treble',()=>{const a=new AudioEnvelope(),data=Array(128).fill(0);for(let i=64;i<72;i++)data[i]=.5;a.receive(data,0);assert.equal(a.target[0],.45);assert.equal(a.target[1],0);assert.equal(a.target[2],0);});
+test('malformed samples remain finite and bounded',()=>{const a=new AudioEnvelope();assert.equal(a.receive([1],0),false);a.receive(Array.from({length:128},(_,i)=>[NaN,Infinity,-20,20,undefined][i%5]),0);for(let i=0;i<200;i++)a.update(.016,i*16,false,0);assert(a.values.every(v=>Number.isFinite(v)&&v>=0&&v<=1));});
+test('attack is responsive, release is smooth and stale input decays to silence',()=>{const a=new AudioEnvelope();a.receive(Array(128).fill(1),0);a.update(.1,100,false,0);assert(a.values[0]>.6&&a.values[0]<1);const peak=a.values[0];a.update(.1,700,false,0);assert(a.values[0]<peak&&a.values[0]>0);for(let i=0;i<100;i++)a.update(.1,1000+i*100,false,0);assert(a.values.every(v=>v<1e-8));});
+test('demo fades back to idle after disabling',()=>{const a=new AudioEnvelope();for(let i=0;i<100;i++)a.update(.016,i*16,true,i/10);assert(a.values.some(v=>v>.1));for(let i=0;i<100;i++)a.update(.1,3000+i*100,false,0);assert(a.values.every(v=>v<1e-8));});
